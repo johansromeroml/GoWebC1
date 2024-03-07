@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Product struct {
@@ -41,7 +42,7 @@ func main() {
 
 	json.Unmarshal(productsJSON, &products.Products)
 
-	fmt.Println(products.Products[5])
+	//fmt.Println(products.Products[4])
 
 	if err != nil {
 		println(err.Error())
@@ -51,11 +52,11 @@ func main() {
 
 	mux.HandleFunc("/ping", ping)
 
-	mux.HandleFunc("/products", productList)
+	mux.HandleFunc("/products/", productSwitch)
 
-	mux.HandleFunc("/products/{id}", productByID)
+	//mux.HandleFunc("/products/{id}", productByID)
 
-	mux.HandleFunc("/products/search?value=", searchProductsPriceGreatherThanValue)
+	mux.HandleFunc("/products/search", searchProductsPriceGreatherThanValue)
 
 	fmt.Println("Starting server ...")
 	//fmt.Println(mux)
@@ -66,7 +67,21 @@ func ping(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(w, "pong")
 }
 
-func productList(w http.ResponseWriter, req *http.Request) {
+func productSwitch(w http.ResponseWriter, req *http.Request) {
+	url := fmt.Sprint(req.URL)
+	param := strings.TrimPrefix(url, "/products/")
+	idParam, err := strconv.Atoi(param)
+	switch {
+	case param == "":
+		productList(w)
+	case err != nil:
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	default:
+		productByID(w, idParam)
+	}
+}
+
+func productList(w http.ResponseWriter) {
 	responseJSON, err := json.Marshal(products)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)
@@ -74,13 +89,19 @@ func productList(w http.ResponseWriter, req *http.Request) {
 	fmt.Fprint(w, string(responseJSON))
 }
 
-func productByID(w http.ResponseWriter, req *http.Request) {
-	idParam := req.PathValue("id")
-	fmt.Fprint(w, idParam)
+func productByID(w http.ResponseWriter, id int) {
+	var retProduct Product
+	for _, prod := range products.Products {
+		if prod.ID == id {
+			retProduct = prod
+		}
+	}
+	fmt.Fprint(w, retProduct)
 }
 
 func searchProductsPriceGreatherThanValue(w http.ResponseWriter, req *http.Request) {
 	valueParam := req.URL.Query().Get("value")
+	fmt.Println(req.URL.Query())
 	value, err := strconv.ParseFloat(valueParam, 64)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -100,6 +121,7 @@ func productsPriceGreaterThanValue(value float64) ProductList {
 			returnList.Products = append(returnList.Products, prod)
 		}
 	}
+	fmt.Println(len(returnList.Products))
 	return returnList
 }
 
